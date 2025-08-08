@@ -33,8 +33,8 @@ class Cell {
     this.container.eventMode = 'static';
     this.container.on('pointerdown', () => {
       if (this.value !== null) {
-        console.log(`click: selected ${this.selected}`);
         this.selected = !this.selected;
+        console.log(`click cell (${this.coordinate.x}, ${this.coordinate.y}), value: ${this.value}, selected ${this.selected}`);
         this.background.clear()
         this.background.rect(cell_margin_px, cell_margin_px, cell_size_px, cell_size_px)
         
@@ -86,7 +86,7 @@ const initial_board_height = 20;
 
 function isMatch(cell1: Cell, cell2: Cell): boolean{
   if (cell1.value === null || cell2.value === null) {
-    throw new Error(`isMatch() called with undefined cell values (cell1: ${cell1.value}, cell2: ${cell2.value})`);
+    throw new Error(`isMatch() called with null cell values (cell1: ${cell1.value}, cell2: ${cell2.value})`);
   }
 
   return cell1.value === cell2.value || cell1.value + cell2.value == 10;
@@ -102,7 +102,7 @@ const matchAnimationContainer: PIXI.Container = new PIXI.Container();
 const matchAnimationGraphics: PIXI.Graphics = new PIXI.Graphics();
 matchAnimationContainer.addChild(matchAnimationGraphics);
 
-function matchAnimation(startCell: Cell, endCell: Cell, wrap: boolean): void {
+function matchAnimation(startCell: Cell, endCell: Cell): void {
   function getCellGlobalCenter(cell: Cell): Coordinate {
     return {
       x: cell.coordinate.x * cell_size_px + cell_size_px / 2 + (cell.coordinate.x + 1) * cell_margin_px,
@@ -139,21 +139,31 @@ function matchAnimation(startCell: Cell, endCell: Cell, wrap: boolean): void {
 }
 
 function failMatch(cell1: Cell, cell2: Cell): void {
-  
+  [cell1, cell2].forEach((cell) => {
+    cell.selected = false;
+    cell.update();
+    cell.draw();
+  });
+  firstSelected = null;
 }
 
-function successMatch(cell1: Cell, cell2: Cell): void {
+function successMatch(cell1: Cell, cell2: Cell, isWrap?: boolean): void {
+  matchAnimation(cell1, cell2, isWrap ? isWrap : false);
   [cell1, cell2].forEach((cell) => {
     cell.value = null;
     cell.update();
     cell.draw();
-  })
+  });
+  firstSelected = null;
 }
 
 
 function tryMatch(startCell: Cell, endCell: Cell) {
+  console.log(`tryMatch call -> (${startCell.coordinate.x}, ${startCell.coordinate.y}), (${endCell.coordinate.x}, ${endCell.coordinate.y})`);
   if (!isMatch(startCell, endCell)) {
     startCell.selected = false;
+    startCell.update();
+    startCell.draw();
     firstSelected = endCell;
     return;
   }
@@ -170,57 +180,80 @@ function tryMatch(startCell: Cell, endCell: Cell) {
 
   // find match type
   if (deltaY === 0) { //horizontal
-    [firstCell, secondCell] = deltaX > 0 ? [startCell, endCell] : [firstCell, secondCell] = [endCell, startCell];
+    console.log(`HORIZONTAL MATCH`);
+    [firstCell, secondCell] = deltaX > 0 ? [startCell, endCell] : [endCell, startCell];
     stepIncrement = {x: 1, y: 0};
     
   } else if (deltaX === 0) { // vertical
-    [firstCell, secondCell] = deltaY > 0 ? [startCell, endCell] : [firstCell, secondCell] = [endCell, startCell];
+    console.log(`VERTICAL MATCH`);
+    [firstCell, secondCell] = deltaY > 0 ? [startCell, endCell] : [endCell, startCell];
     stepIncrement = {x: 0, y: 1};
 
   } else if (Math.abs(deltaY) === Math.abs(deltaX)) { // diagonal
-    [firstCell, secondCell] = deltaY > 0 ? [startCell, endCell] : [firstCell, secondCell] = [endCell, startCell];
+    [firstCell, secondCell] = [startCell, endCell];
     if (deltaY > 0) { // down
       if (deltaX > 0) { // right
+        console.log(`DIAGONAL DOWN RIGHT MATCH`);
         stepIncrement = {x: 1, y: 1};
       } else { // left
+        console.log(`DIAGONAL DOWN LEFT MATCH`);
         stepIncrement = {x: -1, y: 1};
       }
     } else { // up
       if (deltaX > 0) { // right
+        console.log(`DIAGONAL UP RIGHT MATCH`);
         stepIncrement = {x: 1, y: -1};
       } else { // left
+        console.log(`DIAGONAL UP LEFT MATCH`);
         stepIncrement = {x: -1, y: -1};
       }
     }
   } else { // wrap
+    [firstCell, secondCell] = deltaY > 0 ? [startCell, endCell] : [endCell, startCell];
+    console.log(`WRAP MATCH`);
     stepIncrement = {x: 1, y: 0};
     isWrapMatch = true;
   }
 
-  // begin check
-  tempCoord = startCell.coordinate;
-  const endCoord = endCell.coordinate;
-  
-  // while valid
+  console.log(`CELL SELECTION FINISHED -> start: ${JSON.stringify(startCell.coordinate)}, end: ${JSON.stringify(endCell.coordinate)}`);
+
+  tempCoord = structuredClone(firstCell.coordinate);
+  const endCoord = structuredClone(secondCell.coordinate);
   
   const MAX_MATCH_DIST = 500;
 
+  console.log('starting match loop, grid:', grid);
+
   for (let i = 0; i < MAX_MATCH_DIST; i++) {
+    console.log(`stepping test coord -> initial: (${tempCoord.x}, ${tempCoord.y})`);
     stepTestCoord(tempCoord, stepIncrement);
+    console.log(`stepping test coord -> result: (${tempCoord.x}, ${tempCoord.y})`);
 
+    if (tempCoord.y < 0 || tempCoord.y >= grid.length) {
+      console.log(`MATCH FAILED -> vertical edge reached`);
+      failMatch(startCell, endCell);
+      break;
+    }
 
-    if (tempCoord.x >= board_width) {
+    if (tempCoord.x >= board_width || tempCoord.x < 0) {
       if (isWrapMatch) {
-        tempCoord = {x: 0, y: tempCoord.y - 1}
+        if (tempCoord.x < 0) {
+          tempCoord = {x: board_width + 1, y: tempCoord.y - 1}
+        } else {
+          tempCoord = {x: -1, y: tempCoord.y + 1}
+        }
+
         continue;
       }
 
+      console.log(`MATCH FAILED -> horizontal edge reached, not wrap match`);
       failMatch(startCell, endCell);
       break;
     }
 
     if (tempCoord.x === endCoord.x && tempCoord.y === endCoord.y) {
       successMatch(startCell, endCell);
+      console.log(`SUCCESSFUL MATCH`);
       break;
     }
 
@@ -250,6 +283,7 @@ function tryMatch(startCell: Cell, endCell: Cell) {
     grid.push([]);
     for (let j = 0; j < board_width; j++) {
       const temp_cell = new Cell({x: j, y: i});
+      grid[i].push(temp_cell);
 
       mainContainer.addChild(temp_cell.container);
       if (i < initial_fill_rows) {
