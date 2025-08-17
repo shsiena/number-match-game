@@ -32,24 +32,28 @@ class Cell {
 
     this.container.eventMode = 'static';
     this.container.on('pointerdown', () => {
-      if (this.value !== null) {
-        this.selected = !this.selected;
-        console.log(`click cell (${this.coordinate.x}, ${this.coordinate.y}), value: ${this.value}, selected ${this.selected}`);
-        this.background.clear()
-        this.background.rect(cell_margin_px, cell_margin_px, cell_size_px, cell_size_px)
-        
-        this.update();
-
-        if (this.selected && firstSelected === null) {
-          firstSelected = this;
-        } else if (firstSelected !== null) {
-          tryMatch(firstSelected, this);
-        }
-      }
+      this.handleClick();
     });
   }
 
-  update() {
+  handleClick() {
+    if (this.value !== null) {
+      this.selected = !this.selected;
+      console.log(`click cell (${this.coordinate.x}, ${this.coordinate.y}), value: ${this.value}, selected ${this.selected}`);
+      this.background.clear()
+      this.background.rect(cell_margin_px, cell_margin_px, cell_size_px, cell_size_px)
+      
+      this.updateSelected();
+
+      if (this.selected && firstSelected === null) {
+        firstSelected = this;
+      } else if (firstSelected !== null) {
+        tryMatch(firstSelected, this);
+      }
+    }
+  }
+
+  updateSelected() {
     if (this.selected) {
       this.background.fill('gray');
     } else {
@@ -102,7 +106,10 @@ const matchAnimationContainer: PIXI.Container = new PIXI.Container();
 const matchAnimationGraphics: PIXI.Graphics = new PIXI.Graphics();
 matchAnimationContainer.addChild(matchAnimationGraphics);
 
-function matchAnimation(startCell: Cell, endCell: Cell): void {
+function matchAnimation(startCell: Cell, endCell: Cell, isWrap: boolean): void {
+
+  const MATCH_BEAM_WIDTH = 10;
+
   function getCellGlobalCenter(cell: Cell): Coordinate {
     return {
       x: cell.coordinate.x * cell_size_px + cell_size_px / 2 + (cell.coordinate.x + 1) * cell_margin_px,
@@ -113,45 +120,46 @@ function matchAnimation(startCell: Cell, endCell: Cell): void {
   const startPos: Coordinate = getCellGlobalCenter(startCell);
   const endPos: Coordinate = getCellGlobalCenter(endCell);
 
-  const midpoint: Coordinate = { x: (startPos.x + endPos.x) / 2, y: (startPos.y + endPos.y) / 2 };
-  const length: number = Math.sqrt(Math.pow(endPos.x - startPos.x, 2) + Math.pow(endPos.y - startPos.y, 2));
+  matchAnimationGraphics.clear();
 
-  const MATCH_BEAM_WIDTH = 10;
+  if (!isWrap) {
+    const midpoint: Coordinate = { x: (startPos.x + endPos.x) / 2, y: (startPos.y + endPos.y) / 2 };
+    const length: number = Math.sqrt(Math.pow(endPos.x - startPos.x, 2) + Math.pow(endPos.y - startPos.y, 2));
+    matchAnimationGraphics.rect(length / -2, MATCH_BEAM_WIDTH / -2, length, MATCH_BEAM_WIDTH)
+      .fill('red');
 
-  matchAnimationGraphics.clear()
-    .rect(length / -2, MATCH_BEAM_WIDTH / -2, length, MATCH_BEAM_WIDTH)
-    .fill('red');
+    const dx = (startPos.x - endPos.x);
+    const dy = (startPos.y - endPos.y);
+    const theta = Math.atan(dy / dx);
 
-  const dx = (startPos.x - endPos.x);
-  const dy = (startPos.y - endPos.y);
+    matchAnimationGraphics.position.set(midpoint.x, midpoint.y);
+    matchAnimationGraphics.rotation = theta;
 
-  console.log(`
-    startPos: (${startPos.x}, ${startPos.y}), 
-    endPos: (${endPos.x}, ${endPos.y}),
-    dx: ${dx},
-    dy: ${dy}
-  `);
-
-  const theta = Math.atan(dy / dx);
-
-  matchAnimationGraphics.position.set(midpoint.x, midpoint.y);
-  matchAnimationGraphics.rotation = theta;
+    console.log(`
+      startPos: (${startPos.x}, ${startPos.y}), 
+      endPos: (${endPos.x}, ${endPos.y}),
+      dx: ${dx},
+      dy: ${dy}
+    `);
+  } else {
+    
+  }
 }
 
 function failMatch(cell1: Cell, cell2: Cell): void {
   [cell1, cell2].forEach((cell) => {
     cell.selected = false;
-    cell.update();
+    cell.updateSelected();
     cell.draw();
   });
   firstSelected = null;
 }
 
-function successMatch(cell1: Cell, cell2: Cell, isWrap?: boolean): void {
-  matchAnimation(cell1, cell2, isWrap ? isWrap : false);
+function successMatch(cell1: Cell, cell2: Cell, isWrap: boolean): void {
+  matchAnimation(cell1, cell2, isWrap);
   [cell1, cell2].forEach((cell) => {
     cell.value = null;
-    cell.update();
+    cell.updateSelected();
     cell.draw();
   });
   firstSelected = null;
@@ -162,7 +170,7 @@ function tryMatch(startCell: Cell, endCell: Cell) {
   console.log(`tryMatch call -> (${startCell.coordinate.x}, ${startCell.coordinate.y}), (${endCell.coordinate.x}, ${endCell.coordinate.y})`);
   if (!isMatch(startCell, endCell)) {
     startCell.selected = false;
-    startCell.update();
+    startCell.updateSelected();
     startCell.draw();
     firstSelected = endCell;
     return;
@@ -171,6 +179,12 @@ function tryMatch(startCell: Cell, endCell: Cell) {
   const deltaY = endCell.coordinate.y - startCell.coordinate.y;
   const deltaX = endCell.coordinate.x - startCell.coordinate.x;
 
+  const startCellAbove: boolean = deltaY > 0;
+  const startCellLeft: boolean = deltaX > 0;
+  const horizontalMatch: boolean = deltaY === 0;
+  const verticalMatch: boolean = deltaX === 0;
+  const diagonalMatch: boolean = Math.abs(deltaY) === Math.abs(deltaX);
+
   let firstCell: Cell;
   let secondCell: Cell;
 
@@ -178,40 +192,51 @@ function tryMatch(startCell: Cell, endCell: Cell) {
   let stepIncrement: Coordinate;
   let isWrapMatch = false;
 
-  // find match type
-  if (deltaY === 0) { //horizontal
-    console.log(`HORIZONTAL MATCH`);
-    [firstCell, secondCell] = deltaX > 0 ? [startCell, endCell] : [endCell, startCell];
-    stepIncrement = {x: 1, y: 0};
-    
-  } else if (deltaX === 0) { // vertical
-    console.log(`VERTICAL MATCH`);
-    [firstCell, secondCell] = deltaY > 0 ? [startCell, endCell] : [endCell, startCell];
-    stepIncrement = {x: 0, y: 1};
+  const matchStepDirs: Record<string, Coordinate> = {
+    left: {x: 1, y: 0},
+    right: {x: -1, y: 0},
+    up: {x: 0, y: -1},
+    down: {x: 0, y: 1},
+    diag_down_right: {x: 1, y: 1},
+    diag_down_left: {x: -1, y: 1},
+    diag_up_right: {x: 1, y: -1},
+    diag_up_left: {x: -1, y: -1},
+  }
 
-  } else if (Math.abs(deltaY) === Math.abs(deltaX)) { // diagonal
+  // find match type
+  if (horizontalMatch) { //horizontal
+    console.log(`HORIZONTAL MATCH`);
+    [firstCell, secondCell] = startCellLeft ? [startCell, endCell] : [endCell, startCell];
+    stepIncrement = matchStepDirs.left;
+    
+  } else if (verticalMatch) { // vertical
+    console.log(`VERTICAL MATCH`);
+    [firstCell, secondCell] = startCellAbove ? [startCell, endCell] : [endCell, startCell];
+    stepIncrement = matchStepDirs.down;
+
+  } else if (diagonalMatch) { // diagonal
     [firstCell, secondCell] = [startCell, endCell];
-    if (deltaY > 0) { // down
-      if (deltaX > 0) { // right
+    if (startCellAbove) { // down
+      if (startCellLeft) { // right
         console.log(`DIAGONAL DOWN RIGHT MATCH`);
-        stepIncrement = {x: 1, y: 1};
+        stepIncrement = matchStepDirs.diag_down_right;
       } else { // left
         console.log(`DIAGONAL DOWN LEFT MATCH`);
-        stepIncrement = {x: -1, y: 1};
+        stepIncrement = matchStepDirs.diag_down_left;
       }
     } else { // up
-      if (deltaX > 0) { // right
+      if (startCellLeft) { // right
         console.log(`DIAGONAL UP RIGHT MATCH`);
-        stepIncrement = {x: 1, y: -1};
+        stepIncrement = matchStepDirs.diag_up_right;
       } else { // left
         console.log(`DIAGONAL UP LEFT MATCH`);
-        stepIncrement = {x: -1, y: -1};
+        stepIncrement = matchStepDirs.diag_up_left;
       }
     }
   } else { // wrap
-    [firstCell, secondCell] = deltaY > 0 ? [startCell, endCell] : [endCell, startCell];
+    [firstCell, secondCell] = startCellAbove ? [startCell, endCell] : [endCell, startCell];
     console.log(`WRAP MATCH`);
-    stepIncrement = {x: 1, y: 0};
+    stepIncrement = matchStepDirs.left;
     isWrapMatch = true;
   }
 
@@ -236,6 +261,8 @@ function tryMatch(startCell: Cell, endCell: Cell) {
     }
 
     if (tempCoord.x >= board_width || tempCoord.x < 0) {
+      
+      // wrap logic
       if (isWrapMatch) {
         if (tempCoord.x < 0) {
           tempCoord = {x: board_width + 1, y: tempCoord.y - 1}
@@ -252,7 +279,7 @@ function tryMatch(startCell: Cell, endCell: Cell) {
     }
 
     if (tempCoord.x === endCoord.x && tempCoord.y === endCoord.y) {
-      successMatch(startCell, endCell);
+      successMatch(startCell, endCell, isWrapMatch);
       console.log(`SUCCESSFUL MATCH`);
       break;
     }
@@ -261,7 +288,6 @@ function tryMatch(startCell: Cell, endCell: Cell) {
       failMatch(startCell, endCell);
       break;
     }
-
   }
 }
 
@@ -296,7 +322,6 @@ function tryMatch(startCell: Cell, endCell: Cell) {
   }
 
   mainContainer.addChild(matchAnimationContainer);
-
 
   app.ticker.add(() => {
   });
