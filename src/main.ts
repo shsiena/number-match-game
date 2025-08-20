@@ -1,9 +1,16 @@
 import * as PIXI from "pixi.js";
 
-const cell_size_px: number = 40;
-const cell_margin_px: number = 4;
-const initial_fill_rows: number = 4;
+const CELL_SIZE: number = 40; // pixels
+const CELL_MARGIN: number = 4; // pixels
+const INITIAL_FILL_ROWS: number = 4;
+const BOARD_WIDTH = 20;
+const INITIAL_BOARD_HEIGHT = 20;
 
+const SELECTED_CELL_COLOR = new PIXI.Color('#45454d');
+const UNSELECTED_CELL_COLOR = new PIXI.Color('gray');
+const BACKGROUND_COLOR = new PIXI.Color('#232327');
+
+const grid: Array<Array<Cell>> = [];
 let firstSelected: Cell | null = null;
 
 
@@ -27,8 +34,8 @@ class Cell {
     this.display_value.position.x = 10;
     this.display_value.position.y = 10;
 
-    this.container.position.x = this.coordinate.x * (cell_size_px + cell_margin_px) + cell_margin_px;
-    this.container.position.y = this.coordinate.y * (cell_size_px + cell_margin_px) + cell_margin_px;
+    this.container.position.x = this.coordinate.x * (CELL_SIZE + CELL_MARGIN) + CELL_MARGIN;
+    this.container.position.y = this.coordinate.y * (CELL_SIZE + CELL_MARGIN) + CELL_MARGIN;
 
     this.container.eventMode = 'static';
     this.container.on('pointerdown', () => {
@@ -41,7 +48,7 @@ class Cell {
       this.selected = !this.selected;
       console.log(`click cell (${this.coordinate.x}, ${this.coordinate.y}), value: ${this.value}, selected ${this.selected}`);
       this.background.clear()
-      this.background.rect(cell_margin_px, cell_margin_px, cell_size_px, cell_size_px)
+      this.background.rect(CELL_MARGIN, CELL_MARGIN, CELL_SIZE, CELL_SIZE)
       
       this.updateSelected();
 
@@ -55,24 +62,24 @@ class Cell {
 
   updateSelected() {
     if (this.selected) {
-      this.background.fill('gray');
+      this.background.fill(SELECTED_CELL_COLOR);
     } else {
-      this.background.fill('#dee2e6');
+      this.background.fill(UNSELECTED_CELL_COLOR);
     }
   }
 
 
   draw() {
     this.background.clear();
-    this.background.rect(cell_margin_px, cell_margin_px, cell_size_px, cell_size_px)
-      .fill('#dee2e6');
+    this.background.rect(CELL_MARGIN, CELL_MARGIN, CELL_SIZE, CELL_SIZE)
+      .fill(UNSELECTED_CELL_COLOR);
 
 
     if (this.value !== null) {
       this.display_value.text = this.value;
       this.display_value.anchor.set(0.5);
       
-      const center_dist_px = (cell_size_px + 2 * cell_margin_px) / 2; 
+      const center_dist_px = (CELL_SIZE + 2 * CELL_MARGIN) / 2; 
 
       this.display_value.position.x = center_dist_px;
       this.display_value.position.y = center_dist_px;
@@ -82,11 +89,6 @@ class Cell {
   }
 }
 
-
-
-const grid: Array<Array<Cell>> = [];
-const board_width = 20;
-const initial_board_height = 20;
 
 function isMatch(cell1: Cell, cell2: Cell): boolean{
   if (cell1.value === null || cell2.value === null) {
@@ -112,8 +114,8 @@ function matchAnimation(startCell: Cell, endCell: Cell, isWrap: boolean): void {
 
   function getCellGlobalCenter(cell: Cell): Coordinate {
     return {
-      x: cell.coordinate.x * cell_size_px + cell_size_px / 2 + (cell.coordinate.x + 1) * cell_margin_px,
-      y: cell.coordinate.y * cell_size_px + cell_size_px / 2 + (cell.coordinate.y + 1) * cell_margin_px
+      x: cell.coordinate.x * CELL_SIZE + CELL_SIZE / 2 + (cell.coordinate.x + 1) * CELL_MARGIN,
+      y: cell.coordinate.y * CELL_SIZE + CELL_SIZE / 2 + (cell.coordinate.y + 1) * CELL_MARGIN
     }
   }
 
@@ -260,12 +262,12 @@ function tryMatch(startCell: Cell, endCell: Cell) {
       break;
     }
 
-    if (tempCoord.x >= board_width || tempCoord.x < 0) {
+    if (tempCoord.x >= BOARD_WIDTH || tempCoord.x < 0) {
       
       // wrap logic
       if (isWrapMatch) {
         if (tempCoord.x < 0) {
-          tempCoord = {x: board_width + 1, y: tempCoord.y - 1}
+          tempCoord = {x: BOARD_WIDTH + 1, y: tempCoord.y - 1}
         } else {
           tempCoord = {x: -1, y: tempCoord.y + 1}
         }
@@ -298,21 +300,21 @@ function tryMatch(startCell: Cell, endCell: Cell) {
   // @ts-ignore
   globalThis.__PIXI_APP__ = app;
 
-  await app.init({ background: "white", resizeTo: window });
+  await app.init({ background: BACKGROUND_COLOR, resizeTo: window });
 
   document.getElementById("pixi-container")!.appendChild(app.canvas);
 
   const mainContainer = new PIXI.Container();
   app.stage.addChild(mainContainer);
 
-  for (let i = 0; i < initial_board_height; i++) {
+  for (let i = 0; i < INITIAL_BOARD_HEIGHT; i++) {
     grid.push([]);
-    for (let j = 0; j < board_width; j++) {
+    for (let j = 0; j < BOARD_WIDTH; j++) {
       const temp_cell = new Cell({x: j, y: i});
       grid[i].push(temp_cell);
 
       mainContainer.addChild(temp_cell.container);
-      if (i < initial_fill_rows) {
+      if (i < INITIAL_FILL_ROWS) {
         temp_cell.value = Math.floor(Math.random() * 9) + 1;
       }
       temp_cell.draw();
