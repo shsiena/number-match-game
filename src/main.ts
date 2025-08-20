@@ -14,6 +14,10 @@ const grid: Array<Array<Cell>> = [];
 let firstSelected: Cell | null = null;
 
 
+const matchAnimationGraphics: PIXI.Graphics = new PIXI.Graphics();
+const matchAnimationContainer: PIXI.Container = new PIXI.Container()
+  .addChild(matchAnimationGraphics);
+
 type Coordinate = {x: number, y: number};
 
 
@@ -99,14 +103,11 @@ function isMatch(cell1: Cell, cell2: Cell): boolean{
 }
 
 
-function stepTestCoord(coord: Coordinate, step: Coordinate) {
+function stepCoordinate(coord: Coordinate, step: Coordinate) {
   coord.x += step.x;
   coord.y += step.y;
 }
 
-const matchAnimationContainer: PIXI.Container = new PIXI.Container();
-const matchAnimationGraphics: PIXI.Graphics = new PIXI.Graphics();
-matchAnimationContainer.addChild(matchAnimationGraphics);
 
 function matchAnimation(startCell: Cell, endCell: Cell, isWrap: boolean): void {
 
@@ -157,6 +158,7 @@ function failMatch(cell1: Cell, cell2: Cell): void {
   firstSelected = null;
 }
 
+
 function successMatch(cell1: Cell, cell2: Cell, isWrap: boolean): void {
   matchAnimation(cell1, cell2, isWrap);
   [cell1, cell2].forEach((cell) => {
@@ -170,6 +172,7 @@ function successMatch(cell1: Cell, cell2: Cell, isWrap: boolean): void {
 
 function tryMatch(startCell: Cell, endCell: Cell) {
   console.log(`tryMatch call -> (${startCell.coordinate.x}, ${startCell.coordinate.y}), (${endCell.coordinate.x}, ${endCell.coordinate.y})`);
+ 
   if (!isMatch(startCell, endCell)) {
     startCell.selected = false;
     startCell.updateSelected();
@@ -178,11 +181,14 @@ function tryMatch(startCell: Cell, endCell: Cell) {
     return;
   }
 
+  const MAX_MATCH_DIST = 500;
+
   const deltaY = endCell.coordinate.y - startCell.coordinate.y;
   const deltaX = endCell.coordinate.x - startCell.coordinate.x;
 
   const startCellAbove: boolean = deltaY > 0;
   const startCellLeft: boolean = deltaX > 0;
+
   const horizontalMatch: boolean = deltaY === 0;
   const verticalMatch: boolean = deltaX === 0;
   const diagonalMatch: boolean = Math.abs(deltaY) === Math.abs(deltaX);
@@ -247,13 +253,11 @@ function tryMatch(startCell: Cell, endCell: Cell) {
   tempCoord = structuredClone(firstCell.coordinate);
   const endCoord = structuredClone(secondCell.coordinate);
   
-  const MAX_MATCH_DIST = 500;
-
   console.log('starting match loop, grid:', grid);
 
   for (let i = 0; i < MAX_MATCH_DIST; i++) {
     console.log(`stepping test coord -> initial: (${tempCoord.x}, ${tempCoord.y})`);
-    stepTestCoord(tempCoord, stepIncrement);
+    stepCoordinate(tempCoord, stepIncrement);
     console.log(`stepping test coord -> result: (${tempCoord.x}, ${tempCoord.y})`);
 
     if (tempCoord.y < 0 || tempCoord.y >= grid.length) {
