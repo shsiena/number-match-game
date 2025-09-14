@@ -10,6 +10,8 @@ const SELECTED_CELL_COLOR = new PIXI.Color('#45454d');
 const UNSELECTED_CELL_COLOR = new PIXI.Color('gray');
 const BACKGROUND_COLOR = new PIXI.Color('#232327');
 
+const BOARD_WIDTH_PX = (CELL_SIZE + CELL_MARGIN) * BOARD_WIDTH + CELL_MARGIN;
+
 const grid: Array<Array<Cell>> = [];
 let firstSelected: Cell | null = null;
 
@@ -125,7 +127,19 @@ function matchAnimation(startCell: Cell, endCell: Cell, isWrap: boolean): void {
 
   matchAnimationGraphics.clear();
 
-  if (!isWrap) {
+  if (isWrap) {
+
+    const [topPos, bottomPos]: [Coordinate, Coordinate] = startPos.y < endPos.y ? [startPos, endPos] : [endPos, startPos];
+
+    const leftSegmentLength = bottomPos.x;
+    const rightSegmentLength = BOARD_WIDTH_PX - topPos.x;
+    matchAnimationGraphics.position.set(0, 0);
+    matchAnimationGraphics.rotation = 0;
+    matchAnimationGraphics.rect(0, bottomPos.y, leftSegmentLength, MATCH_BEAM_WIDTH);
+    matchAnimationGraphics.rect(topPos.x, topPos.y, rightSegmentLength, MATCH_BEAM_WIDTH);
+    matchAnimationGraphics.fill('red');
+    
+  } else {
     const midpoint: Coordinate = { x: (startPos.x + endPos.x) / 2, y: (startPos.y + endPos.y) / 2 };
     const length: number = Math.sqrt(Math.pow(endPos.x - startPos.x, 2) + Math.pow(endPos.y - startPos.y, 2));
     matchAnimationGraphics.rect(length / -2, MATCH_BEAM_WIDTH / -2, length, MATCH_BEAM_WIDTH)
@@ -135,7 +149,7 @@ function matchAnimation(startCell: Cell, endCell: Cell, isWrap: boolean): void {
     const dy = (startPos.y - endPos.y);
     const theta = Math.atan(dy / dx);
 
-    matchAnimationGraphics.position.set(midpoint.x, midpoint.y);
+    matchAnimationGraphics.position.set(midpoint.x + CELL_MARGIN, midpoint.y + CELL_MARGIN);
     matchAnimationGraphics.rotation = theta;
 
     console.log(`
@@ -144,8 +158,6 @@ function matchAnimation(startCell: Cell, endCell: Cell, isWrap: boolean): void {
       dx: ${dx},
       dy: ${dy}
     `);
-  } else {
-    
   }
 }
 
