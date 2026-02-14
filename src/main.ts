@@ -1,19 +1,22 @@
 import * as PIXI from "pixi.js";
-import lerp from "./utils/lerp.ts"
+import { gsap } from 'gsap';
+import { PixiPlugin } from "gsap/PixiPlugin";
+
+gsap.registerPlugin(PixiPlugin);
 
 const CELL_SIZE: number = 40; // pixels
 const CELL_MARGIN: number = 4; // pixels
 const INITIAL_FILL_ROWS: number = 4;
-const BOARD_WIDTH = 20;
-const INITIAL_BOARD_HEIGHT = 20;
+const BOARD_WIDTH: number = 20;
+const INITIAL_BOARD_HEIGHT: number = 20;
 
-const SELECTED_CELL_COLOR = new PIXI.Color('#45454d');
-const UNSELECTED_CELL_COLOR = new PIXI.Color('gray');
-const BACKGROUND_COLOR = new PIXI.Color('#232327');
+const SELECTED_CELL_COLOR: PIXI.Color = new PIXI.Color('#45454d');
+const UNSELECTED_CELL_COLOR: PIXI.Color = new PIXI.Color('gray');
+const BACKGROUND_COLOR: PIXI.Color = new PIXI.Color('#232327');
 
-const BOARD_WIDTH_PX = (CELL_SIZE + CELL_MARGIN) * BOARD_WIDTH + CELL_MARGIN;
+const BOARD_WIDTH_PX: number = (CELL_SIZE + CELL_MARGIN) * BOARD_WIDTH + CELL_MARGIN;
 
-const MATCH_ANIMATION_FRAMES = 10;
+const MATCH_ANIMATION_FRAMES: number = 10;
 
 const grid: Array<Array<Cell>> = [];
 let firstSelected: Cell | null = null;
@@ -102,14 +105,6 @@ class Cell {
 }
 
 
-function isMatch(cell1: Cell, cell2: Cell): boolean{
-  if (cell1.value === null || cell2.value === null) {
-    throw new Error(`isMatch() called with null cell values (cell1: ${cell1.value}, cell2: ${cell2.value})`);
-  }
-
-  return cell1.value === cell2.value || cell1.value + cell2.value == 10;
-}
-
 
 function stepCoordinate(coord: Coordinate, step: Coordinate) {
   coord.x += step.x;
@@ -127,10 +122,19 @@ class MatchHandler {
   }
 
 
+  isMatch(cell1: Cell, cell2: Cell): boolean{
+    if (cell1.value === null || cell2.value === null) {
+      throw new Error(`isMatch() called with null cell values (cell1: ${cell1.value}, cell2: ${cell2.value})`);
+    }
+
+    return cell1.value === cell2.value || cell1.value + cell2.value == 10;
+  }
+
+
   tryMatch(startCell: Cell, endCell: Cell) {
     console.log(`tryMatch call -> (${startCell.coordinate.x}, ${startCell.coordinate.y}), (${endCell.coordinate.x}, ${endCell.coordinate.y})`);
    
-    if (!isMatch(startCell, endCell)) {
+    if (!this.isMatch(startCell, endCell)) {
       startCell.selected = false;
       startCell.updateSelected();
       startCell.draw();
@@ -329,10 +333,6 @@ class MatchHandler {
   tick(): void {
     if (this.state > 0) {
       // TODO: tick animation
-      
-
-      
-      
       
       this.state -= 1;
     }
